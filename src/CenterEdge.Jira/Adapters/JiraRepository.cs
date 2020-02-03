@@ -25,6 +25,7 @@ namespace CenterEdge.JiraLibrary.Adapters
         {
             "\"Open\"",
             "\"In Progress\"",
+            "\"Code Review\"",
             "\"QA\""
         };
         private readonly IList<string> _parentWorkItemTypes = new List<string>()
@@ -176,8 +177,6 @@ namespace CenterEdge.JiraLibrary.Adapters
             var jiraIssues = new List<JiraIssue>();
 
             var jira = GetJiraClient();
-
-
 
             return await SearchKanbanAsync(jira, userName);
         }

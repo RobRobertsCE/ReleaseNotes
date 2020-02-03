@@ -46,45 +46,38 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         {
             IList<ReleaseTag> releases = new List<ReleaseTag>();
 
-            try
+            IReadOnlyList<RepositoryTag> tags = null;
+
+            GitHubClient client = GetClient();
+
+            ApiOptions apiOptions = new ApiOptions()
             {
-                IReadOnlyList<RepositoryTag> tags = null;
+                PageCount = 1,
+                PageSize = 20,
+                StartPage = 1
+            };
 
-                GitHubClient client = GetClient();
+            tags = await client.Repository.GetAllTags(repositoryId, apiOptions);
 
-                ApiOptions apiOptions = new ApiOptions()
+            while (tags.Count > 0)
+            {
+                foreach (RepositoryTag tag in tags)
                 {
-                    PageCount = 1,
-                    PageSize = 20,
-                    StartPage = 1
-                };
+                    Version versionBuffer = GetVersionFromTag(tag.Name);
+
+                    releases.Add(new ReleaseTag()
+                    {
+                        Name = tag.Name,
+                        Release = GetVersionFromTag(tag.Name),
+                        CommitSha = tag.Commit.Sha,
+                        CommitRef = tag.Commit.Ref,
+                        IsPatch = tag.Name.Contains("patch")
+                    });
+                }
+
+                apiOptions.StartPage++;
 
                 tags = await client.Repository.GetAllTags(repositoryId, apiOptions);
-
-                while (tags.Count > 0)
-                {
-                    foreach (RepositoryTag tag in tags)
-                    {
-                        Version versionBuffer = GetVersionFromTag(tag.Name);
-
-                        releases.Add(new ReleaseTag()
-                        {
-                            Name = tag.Name,
-                            Release = GetVersionFromTag(tag.Name),
-                            CommitSha = tag.Commit.Sha,
-                            CommitRef = tag.Commit.Ref,
-                            IsPatch = tag.Name.Contains("patch")
-                        });
-                    }
-
-                    apiOptions.StartPage++;
-
-                    tags = await client.Repository.GetAllTags(repositoryId, apiOptions);
-                }
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler(ex);
             }
 
             return releases;
@@ -100,27 +93,20 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         {
             IList<WorkItem> workItems = new List<WorkItem>();
 
-            try
-            {
-                GitHubClient client = GetClient();
+            GitHubClient client = GetClient();
 
-                var advantageReleaseTags = await GetReleaseTagsAsync(repositoryId);
+            var advantageReleaseTags = await GetReleaseTagsAsync(repositoryId);
 
-                var mostRecentTwoReleases = advantageReleaseTags
-                    .Where(r => r.IsPatch == false)
-                    .OrderByDescending(r => r.Release)
-                    .Take(2)
-                    .ToArray();
+            var mostRecentTwoReleases = advantageReleaseTags
+                .Where(r => r.IsPatch == false)
+                .OrderByDescending(r => r.Release)
+                .Take(2)
+                .ToArray();
 
-                var head = mostRecentTwoReleases[0];
-                var @base = mostRecentTwoReleases[1];
+            var head = mostRecentTwoReleases[0];
+            var @base = mostRecentTwoReleases[1];
 
-                return await GetWorkItemsInRangeAsync(client, repositoryId, @base, head);
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler(ex);
-            }
+            workItems = await GetWorkItemsInRangeAsync(client, repositoryId, @base, head);
 
             return workItems;
         }
@@ -133,20 +119,9 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         }
         public async Task<IList<WorkItem>> GetReleaseWorkItemsInRangeAsync(long repositoryId, ReleaseTag @base, ReleaseTag head)
         {
-            IList<WorkItem> workItems = new List<WorkItem>();
+            GitHubClient client = GetClient();
 
-            try
-            {
-                GitHubClient client = GetClient();
-
-                return await GetWorkItemsInRangeAsync(client, repositoryId, @base, head);
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler(ex);
-            }
-
-            return workItems;
+            return await GetWorkItemsInRangeAsync(client, repositoryId, @base, head);
         }
 
         public async Task<IList<WorkItem>> GetReleaseWorkItemsAsync(ReleaseTag releaseTag)
@@ -157,61 +132,43 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         }
         public async Task<IList<WorkItem>> GetReleaseWorkItemsAsync(long repositoryId, ReleaseTag releaseTag)
         {
-            IList<WorkItem> workItems = new List<WorkItem>();
+            GitHubClient client = GetClient();
 
-            try
-            {
-                GitHubClient client = GetClient();
-
-                return await GetWorkItemsInReleaseAsync(client, repositoryId, releaseTag);
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler(ex);
-            }
-
-            return workItems;
+            return await GetWorkItemsInReleaseAsync(client, repositoryId, releaseTag);
         }
 
         public async Task<IList<GitHubPullRequest>> GetPullRequestsAsync()
         {
             IList<GitHubPullRequest> openPullRequests = new List<GitHubPullRequest>();
 
-            try
+            Repository gitHubRepo = await GetRepositoryAsync();
+
+            GitHubClient client = GetClient();
+
+            var pullRequests = await client.Repository.PullRequest.GetAllForRepository(gitHubRepo.Id);
+
+            foreach (PullRequest pr in pullRequests)
             {
-                Repository gitHubRepo = await GetRepositoryAsync();
+                var pullRequest = ToGitHubPullRequest(pr);
 
-                GitHubClient client = GetClient();
+                var reviews = await client.PullRequest.Review.GetAll(gitHubRepo.Id, pr.Number);
 
-                var pullRequests = await client.Repository.PullRequest.GetAllForRepository(gitHubRepo.Id);
-
-                foreach (PullRequest pr in pullRequests)
+                if (reviews.Any())
                 {
-                    var pullRequest = ToGitHubPullRequest(pr);
-
-                    var reviews = await client.PullRequest.Review.GetAll(gitHubRepo.Id, pr.Number);
-
-                    if (reviews.Any())
-                    {
-                        pullRequest.HasBeenReviewed = true;
-                    }
-
-                    if (reviews.Any(r => r.State == "Commented"))
-                    {
-                        pullRequest.HasRequestedChanges = true;
-                    }
-
-                    if (reviews.Any(r => r.State == "Approved"))
-                    {
-                        pullRequest.IsApproved = true;
-                    }
-
-                    openPullRequests.Add(pullRequest);
+                    pullRequest.HasBeenReviewed = true;
                 }
-            }
-            catch (Exception ex)
-            {
-                ExceptionHandler(ex);
+
+                if (reviews.Any(r => r.State == "Commented"))
+                {
+                    pullRequest.HasRequestedChanges = true;
+                }
+
+                if (reviews.Any(r => r.State == "Approved"))
+                {
+                    pullRequest.IsApproved = true;
+                }
+
+                openPullRequests.Add(pullRequest);
             }
 
             return openPullRequests;
@@ -220,7 +177,6 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         #endregion
 
         #region protected
-
 
         protected virtual IList<GitHubPullRequest> ToGitHubPullRequests(IReadOnlyList<PullRequest> pullRequests)
         {
@@ -351,61 +307,33 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
             return new Version(0, 0);
         }
 
-        protected virtual void ExceptionHandler(Exception ex)
-        {
-            Console.WriteLine(ex.ToString());
-        }
-
         protected virtual GitHubClient GetClient()
         {
-            try
-            {
-                var identity = $"{_gitHubOptions.Value.companyName}";
-                //var productInformation = new ProductHeaderValue(identity);
-                //var credentials = new Credentials(_gitHubOptions.Value.token);
-                //var client = new GitHubClient(productInformation) { Credentials = credentials };
+            var identity = $"{_gitHubOptions.Value.companyName}";
+            //var productInformation = new ProductHeaderValue(identity);
+            //var credentials = new Credentials(_gitHubOptions.Value.token);
+            //var client = new GitHubClient(productInformation) { Credentials = credentials };
 
-                var username = "robrobertsce";
-                var password = _gitHubOptions.Value.token;// "hel-j205";
-                var productInformation = new ProductHeaderValue(identity);
-                var credentials = new Credentials(username, password, AuthenticationType.Basic);
-                var client = new GitHubClient(productInformation) { Credentials = credentials };
+            var username = "robrobertsce";
+            var password = _gitHubOptions.Value.token;// "hel-j205";
+            var productInformation = new ProductHeaderValue(identity);
+            var credentials = new Credentials(username, password, AuthenticationType.Basic);
 
-                return client;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                throw;
-            }
+            return new GitHubClient(productInformation) { Credentials = credentials };
         }
 
         protected virtual async Task<Repository> GetRepositoryAsync()
         {
-            Repository repository = null;
+            GitHubClient client = GetClient();
 
-            try
-            {
-                GitHubClient client = GetClient();
-
-                repository = await client.Repository.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                throw;
-            }
-
-            return repository;
+            return await client.Repository.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName);
         }
 
         protected virtual async Task<Branch> GetMasterBranchAsync()
         {
             GitHubClient client = GetClient();
 
-            Branch masterBranch = await client.Repository.Branch.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName, "master");
-
-            return masterBranch;
+            return await client.Repository.Branch.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName, "master");
         }
 
         protected virtual async Task<IList<WorkItem>> GetWorkItemsInRangeAsync(GitHubClient client, long repositoryId, ReleaseTag @base, ReleaseTag head)
@@ -538,6 +466,5 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
         }
 
         #endregion
-
     }
 }
