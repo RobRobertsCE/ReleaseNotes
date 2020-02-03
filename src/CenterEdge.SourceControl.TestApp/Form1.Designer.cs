@@ -1,5 +1,8 @@
 ﻿namespace CenterEdge.SourceControl.TestApp
 {
+    // https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line
+    // https://www.codeproject.com/Articles/1277348/Using-Csharp-Code-to-Access-the-GitHub-API
+
     partial class Form1
     {
         /// <summary>
@@ -35,9 +38,11 @@
             this.lstEndRelease = new System.Windows.Forms.ListBox();
             this.btnSelectedRange = new System.Windows.Forms.Button();
             this.pnlControls = new System.Windows.Forms.Panel();
-            this.txtReleaseNotes = new System.Windows.Forms.TextBox();
             this.btnSelectedRelease = new System.Windows.Forms.Button();
+            this.txtReleaseNotes = new System.Windows.Forms.TextBox();
+            this.dataGridView1 = new System.Windows.Forms.DataGridView();
             this.pnlControls.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.SuspendLayout();
             // 
             // btnCurrentRelease
@@ -99,6 +104,7 @@
             // 
             // pnlControls
             // 
+            this.pnlControls.Controls.Add(this.dataGridView1);
             this.pnlControls.Controls.Add(this.btnSelectedRelease);
             this.pnlControls.Controls.Add(this.btnCurrentRelease);
             this.pnlControls.Controls.Add(this.btnSelectedRange);
@@ -110,21 +116,8 @@
             this.pnlControls.Enabled = false;
             this.pnlControls.Location = new System.Drawing.Point(0, 0);
             this.pnlControls.Name = "pnlControls";
-            this.pnlControls.Size = new System.Drawing.Size(788, 177);
+            this.pnlControls.Size = new System.Drawing.Size(1021, 177);
             this.pnlControls.TabIndex = 6;
-            // 
-            // txtReleaseNotes
-            // 
-            this.txtReleaseNotes.AcceptsReturn = true;
-            this.txtReleaseNotes.AcceptsTab = true;
-            this.txtReleaseNotes.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtReleaseNotes.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtReleaseNotes.Location = new System.Drawing.Point(0, 177);
-            this.txtReleaseNotes.Multiline = true;
-            this.txtReleaseNotes.Name = "txtReleaseNotes";
-            this.txtReleaseNotes.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtReleaseNotes.Size = new System.Drawing.Size(788, 372);
-            this.txtReleaseNotes.TabIndex = 7;
             // 
             // btnSelectedRelease
             // 
@@ -137,11 +130,32 @@
             this.btnSelectedRelease.UseVisualStyleBackColor = true;
             this.btnSelectedRelease.Click += new System.EventHandler(this.btnSelectedRelease_Click);
             // 
+            // txtReleaseNotes
+            // 
+            this.txtReleaseNotes.AcceptsReturn = true;
+            this.txtReleaseNotes.AcceptsTab = true;
+            this.txtReleaseNotes.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtReleaseNotes.Font = new System.Drawing.Font("Courier New", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.txtReleaseNotes.Location = new System.Drawing.Point(0, 177);
+            this.txtReleaseNotes.Multiline = true;
+            this.txtReleaseNotes.Name = "txtReleaseNotes";
+            this.txtReleaseNotes.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            this.txtReleaseNotes.Size = new System.Drawing.Size(1021, 372);
+            this.txtReleaseNotes.TabIndex = 7;
+            // 
+            // dataGridView1
+            // 
+            this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.Location = new System.Drawing.Point(468, 13);
+            this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.Size = new System.Drawing.Size(541, 150);
+            this.dataGridView1.TabIndex = 7;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(788, 549);
+            this.ClientSize = new System.Drawing.Size(1021, 549);
             this.Controls.Add(this.txtReleaseNotes);
             this.Controls.Add(this.pnlControls);
             this.Name = "Form1";
@@ -149,6 +163,7 @@
             this.Load += new System.EventHandler(this.Form1_Load);
             this.pnlControls.ResumeLayout(false);
             this.pnlControls.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -165,6 +180,7 @@
         private System.Windows.Forms.Panel pnlControls;
         private System.Windows.Forms.TextBox txtReleaseNotes;
         private System.Windows.Forms.Button btnSelectedRelease;
+        private System.Windows.Forms.DataGridView dataGridView1;
     }
 }
 

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace CenterEdge.SourceControl.TestApp
+namespace ReleaseNotesHelper
 {
     static class Program
     {
@@ -16,7 +16,7 @@ namespace CenterEdge.SourceControl.TestApp
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new CeDeveloperStatusView());
+            Application.Run(new Form1());
         }
     }
 }

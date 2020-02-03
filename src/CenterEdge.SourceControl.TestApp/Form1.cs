@@ -32,13 +32,9 @@ namespace CenterEdge.SourceControl.TestApp
             {
                 _provider = GetServiceProvider();
 
-                //var jira = _provider.GetRequiredService<IJiraRepository>();
-                
-                //var issue = await jira.GetJiraIssueAsync("ADV-15109");
+                await LoadJiraIssuesAsync();
 
-                //var issues = await jira.GetJiraIssuesAsync();
-
-                await LoadReleaseTagsAsync();
+                await LoadReleasesAsync();
 
                 _loading = false;
 
@@ -51,7 +47,18 @@ namespace CenterEdge.SourceControl.TestApp
             }
         }
 
-        private async Task LoadReleaseTagsAsync()
+        private async Task LoadJiraIssuesAsync()
+        {
+            var jiraRepository = _provider.GetRequiredService<IJiraRepository>();
+
+            var issues = await jiraRepository.GetJiraIssuesAsync();
+
+            var filtered = issues.Where(i => i.AssignedTo == "rroberts" || i.Developer == "rroberts").OrderBy(i => i.Key).ToList();
+
+            dataGridView1.DataSource = filtered;
+        }
+
+        private async Task LoadReleasesAsync()
         {
             IWorkItemRepository workItemRepository = _provider.GetRequiredService<IWorkItemRepository>();
 

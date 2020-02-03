@@ -16,16 +16,16 @@ namespace CenterEdge.JiraLibrary
 
         public static IServiceCollection AddJira(this IServiceCollection services, IConfiguration configuration)
         {
-            return services.AddJira(gitHubOptions => configuration.GetSection(JiraOptions.JiraConfigurationSection).Bind(gitHubOptions));
+            return services.AddJira(jiraOptions => configuration.GetSection(JiraOptions.JiraConfigurationSection).Bind(jiraOptions));
         }
 
         public static IServiceCollection AddJira(
            this IServiceCollection services,
-           Action<JiraOptions> gitHubOptionsAction)
+           Action<JiraOptions> jiraOptions)
         {
-            if (gitHubOptionsAction != null)
+            if (jiraOptions != null)
             {
-                services.Configure(gitHubOptionsAction);
+                services.Configure(jiraOptions);
             }
 
             services.AddTransient<IJiraRepository, JiraRepository>();

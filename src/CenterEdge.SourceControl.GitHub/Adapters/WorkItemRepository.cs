@@ -13,13 +13,28 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
 {
     internal class WorkItemRepository : IWorkItemRepository
     {
+        #region consts
+
+        private const string IssueTrackerUrlToken = "https://centeredge.atlassian.net/browse/";
+
+        #endregion
+
+        #region fields
+
         private readonly IOptions<GitHubOptions> _gitHubOptions;
-        private static string _urlToken = "https://centeredge.atlassian.net/browse/";
+
+        #endregion
+
+        #region ctor
 
         public WorkItemRepository(IOptions<GitHubOptions> gitHubOptions)
         {
             _gitHubOptions = gitHubOptions ?? throw new ArgumentNullException(nameof(gitHubOptions));
         }
+
+        #endregion
+
+        #region public
 
         public async Task<IList<ReleaseTag>> GetReleaseTagsAsync()
         {
@@ -158,48 +173,40 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
             return workItems;
         }
 
-        public async Task<IList<ReleaseItem>> GetReleasesAsync()
+        public async Task<IList<GitHubPullRequest>> GetPullRequestsAsync()
         {
-            Repository gitHubRepo = await GetRepositoryAsync();
-
-            return await GetReleasesAsync(gitHubRepo.Id);
-        }
-        public async Task<IList<ReleaseItem>> GetReleasesAsync(long repositoryId)
-        {
-            IList<ReleaseItem> releaseItems = new List<ReleaseItem>();
+            IList<GitHubPullRequest> openPullRequests = new List<GitHubPullRequest>();
 
             try
             {
-                IReadOnlyList<Release> releases = null;
+                Repository gitHubRepo = await GetRepositoryAsync();
 
                 GitHubClient client = GetClient();
 
-                ApiOptions apiOptions = new ApiOptions()
-                {
-                    PageCount = 1,
-                    PageSize = 20,
-                    StartPage = 1
-                };
+                var pullRequests = await client.Repository.PullRequest.GetAllForRepository(gitHubRepo.Id);
 
-                releases = await client.Repository.Release.GetAll(repositoryId, apiOptions);
-
-                while (releases.Count > 0)
+                foreach (PullRequest pr in pullRequests)
                 {
-                    foreach (Release release in releases)
+                    var pullRequest = ToGitHubPullRequest(pr);
+
+                    var reviews = await client.PullRequest.Review.GetAll(gitHubRepo.Id, pr.Number);
+
+                    if (reviews.Any())
                     {
-                        Version versionBuffer = GetVersionFromTag(release.Name);
-
-                        releaseItems.Add(new ReleaseItem()
-                        {
-                            Name = release.Name,
-                            Release = GetVersionFromTag(release.Name),
-                            CreatedAt = release.CreatedAt
-                        });
+                        pullRequest.HasBeenReviewed = true;
                     }
 
-                    apiOptions.StartPage++;
+                    if (reviews.Any(r => r.State == "Commented"))
+                    {
+                        pullRequest.HasRequestedChanges = true;
+                    }
 
-                    releases = await client.Repository.Release.GetAll(repositoryId, apiOptions);
+                    if (reviews.Any(r => r.State == "Approved"))
+                    {
+                        pullRequest.IsApproved = true;
+                    }
+
+                    openPullRequests.Add(pullRequest);
                 }
             }
             catch (Exception ex)
@@ -207,9 +214,53 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
                 ExceptionHandler(ex);
             }
 
-            return releaseItems;
+            return openPullRequests;
         }
 
+        #endregion
+
+        #region protected
+
+
+        protected virtual IList<GitHubPullRequest> ToGitHubPullRequests(IReadOnlyList<PullRequest> pullRequests)
+        {
+            IList<GitHubPullRequest> openPullRequests = new List<GitHubPullRequest>();
+
+            foreach (PullRequest pullRequest in pullRequests)
+            {
+                var openPullRequest = new GitHubPullRequest()
+                {
+                    Id = pullRequest.Id,
+                    Title = pullRequest.Title,
+                    Status = pullRequest.State.ToString(),
+                    Number = pullRequest.Number,
+                    JiraKey = GetJiraKeyFromTitle(pullRequest.Title),
+                    IsReadyForQA = pullRequest.Labels.Any(l => l.Name == "Ready For QA"),
+                    IsPatch = pullRequest.Labels.Any(l => l.Name == "Patch Included"),
+                    IsOnHold = pullRequest.Labels.Any(l => l.Name == "On Hold")
+                };
+
+                openPullRequests.Add(openPullRequest);
+            }
+
+            return openPullRequests;
+        }
+        protected virtual GitHubPullRequest ToGitHubPullRequest(PullRequest pullRequest)
+        {
+            var openPullRequest = new GitHubPullRequest()
+            {
+                Id = pullRequest.Id,
+                Title = pullRequest.Title,
+                Status = pullRequest.State.ToString(),
+                Number = pullRequest.Number,
+                JiraKey = GetJiraKeyFromTitle(pullRequest.Title),
+                IsReadyForQA = pullRequest.Labels.Any(l => l.Name == "Ready For QA"),
+                IsPatch = pullRequest.Labels.Any(l => l.Name == "Patch Included"),
+                IsOnHold = pullRequest.Labels.Any(l => l.Name == "On Hold")
+            };
+
+            return openPullRequest;
+        }
         protected virtual WorkItem GetWorkItemFromGitHubCommit(GitHubCommit commit, Version release)
         {
             WorkItem workItem = new WorkItem()
@@ -230,10 +281,10 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
                 {
                     continue;
                 }
-                else if (workItemMessageLine.StartsWith(_urlToken))
+                else if (workItemMessageLine.StartsWith(IssueTrackerUrlToken))
                 {
                     workItem.JiraUrl = workItemMessageLine.Replace("\n", "");
-                    workItem.JiraTag = workItem.JiraUrl.Substring(_urlToken.Length);
+                    workItem.JiraTag = workItem.JiraUrl.Substring(IssueTrackerUrlToken.Length);
                     continue;
                 }
                 else if (workItemMessageLine.StartsWith("Motivation"))
@@ -307,19 +358,43 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
 
         protected virtual GitHubClient GetClient()
         {
-            var identity = $"{_gitHubOptions.Value.companyName}";
-            var productInformation = new ProductHeaderValue(identity);
-            var credentials = new Credentials(_gitHubOptions.Value.token);
-            var client = new GitHubClient(productInformation) { Credentials = credentials };
+            try
+            {
+                var identity = $"{_gitHubOptions.Value.companyName}";
+                //var productInformation = new ProductHeaderValue(identity);
+                //var credentials = new Credentials(_gitHubOptions.Value.token);
+                //var client = new GitHubClient(productInformation) { Credentials = credentials };
 
-            return client;
+                var username = "robrobertsce";
+                var password = _gitHubOptions.Value.token;// "hel-j205";
+                var productInformation = new ProductHeaderValue(identity);
+                var credentials = new Credentials(username, password, AuthenticationType.Basic);
+                var client = new GitHubClient(productInformation) { Credentials = credentials };
+
+                return client;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                throw;
+            }
         }
 
         protected virtual async Task<Repository> GetRepositoryAsync()
         {
-            GitHubClient client = GetClient();
+            Repository repository = null;
 
-            Repository repository = await client.Repository.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName);
+            try
+            {
+                GitHubClient client = GetClient();
+
+                repository = await client.Repository.Get(_gitHubOptions.Value.companyName, _gitHubOptions.Value.repoName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                throw;
+            }
 
             return repository;
         }
@@ -452,5 +527,17 @@ namespace CenterEdge.SourceControl.GitHub.Adapters
 
             return workItems;
         }
+
+        #endregion
+
+        #region private
+
+        private string GetJiraKeyFromTitle(string title)
+        {
+            return title.Substring(title.LastIndexOf('(') + 1).TrimEnd(')');
+        }
+
+        #endregion
+
     }
 }
